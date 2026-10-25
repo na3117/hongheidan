@@ -392,6 +392,27 @@
   }
   .toast.hide { opacity: 0; }
 
+  /* ---------- 結果畫面：超大字 贏／輸 ---------- */
+  .res-stage { flex: 1 1 auto; display: grid; place-content: center; justify-items: center; gap: 12px; text-align: center; min-height: 0; }
+  .res-big {
+    font-family: var(--display);
+    font-weight: 900;
+    font-size: min(46vw, 230px);
+    line-height: 1;
+    animation: pop .55s cubic-bezier(.2, 1.5, .4, 1) both;
+  }
+  .res-big.win { color: var(--brass); text-shadow: 0 8px 40px color-mix(in srgb, var(--brass) 40%, transparent); }
+  .res-big.lose { color: var(--bad); text-shadow: 0 8px 40px color-mix(in srgb, var(--bad) 45%, transparent); }
+  .res-big.safe { color: var(--good); font-size: min(30vw, 150px); }
+  .res-big.none { color: var(--ink-dim); font-size: min(26vw, 130px); }
+  @keyframes pop { 0% { transform: scale(.3); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  .res-line { font-family: var(--display); font-weight: 900; font-size: clamp(34px, 11vw, 56px); line-height: 1.2; color: var(--ivory); letter-spacing: .04em; word-break: break-all; }
+  .res-line.lose { color: var(--bad); }
+  .res-line.small { font-size: 22px; }
+  .res-detail { font-size: 15px; color: var(--ink-dim); }
+  .res-foot { display: grid; gap: 10px; justify-items: stretch; }
+  .res-foot .ghost { justify-self: center; }
+
   @media (max-height: 640px) {
     .screen { gap: 9px; padding-block: 8px 12px; }
     .count-num { font-size: 48px; }
@@ -503,6 +524,24 @@
     <button class="call" type="button" data-k="小"><span class="w">小</span><span class="n">1 2 3</span></button>
   </div>
   <div class="bottom"><button class="primary" id="guessBtn" type="button" hidden>最後一顆 · 盲猜</button></div>
+</section>
+
+<!-- ========== 一局結束：贏／輸 ========== -->
+<section class="screen result" id="result" hidden>
+  <header class="bar">
+    <div class="room-chip"><span class="dot" data-dot></span>房號 <b data-code>----</b></div>
+    <div class="bar-btns">
+      <button class="ghost" type="button" data-mute aria-label="音效開關">🔊</button>
+      <button class="ghost" type="button" data-rules>規則</button>
+      <button class="ghost" type="button" data-leave>離開</button>
+    </div>
+  </header>
+  <div class="res-stage" id="resStage" aria-live="polite"></div>
+  <div class="res-foot">
+    <button class="primary" id="againBtn" type="button" hidden>再來一局</button>
+    <button class="ghost" id="orderBtn" type="button" hidden>調整順序</button>
+    <p class="msg" id="resMsg"></p>
+  </div>
 </section>
 
 <!-- ========== 規則 ========== -->
@@ -876,6 +915,7 @@
     settlePending();
     effects(fx);
     if (S.phase !== 'playing' || !S.round || S.round.turn !== room.sid) $('guessSheet').hidden = true;
+    if (S.phase === 'playing') lobbyOpen = false;
     render();
   }
 
@@ -935,9 +975,9 @@
     prevTurnMine = tm;
     const rk = resultKey();
     if (rk && rk !== prevResultKey) {
-      const r = S.result;
-      if (r.type === 'blind' && r.win) sfx.win(0.4);
-      else if (r.type !== 'abort') sfx.lose(0.5);
+      const o = outcome(S.result);
+      if (o === 'lose') sfx.lose(0.5);
+      else if (o === 'win' || o === 'safe') sfx.win(0.4);
     }
     prevResultKey = rk;
   }
@@ -1181,7 +1221,7 @@
   function enterRoom() {
     ST = {}; my = store.get(myKey()); pendingAct = null;
     S = isHost() ? store.get(hostKey()) : null;
-    firstState = true; lookupUntil = 0; lastJoinAt = 0; prevPlayers = null; lastLog = null; lastStKey = '';
+    firstState = true; lookupUntil = 0; lastJoinAt = 0; prevPlayers = null; lastLog = null; lastStKey = ''; lobbyOpen = false;
     live.beat = [{}, {}]; live.gone = [{}, {}]; live.off = {};
     net.downSince = 0;
     for (const el of $$('[data-code]')) el.textContent = room.code;
@@ -1213,7 +1253,8 @@
   }
 
   // ================= 畫面 =================
-  const SCREENS = ['home', 'lobby', 'game'];
+  const SCREENS = ['home', 'lobby', 'game', 'result'];
+  let lobbyOpen = false; // 房主在結果畫面按了「調整順序」
   function show(id) { for (const s of SCREENS) $(s).hidden = s !== id; }
   let renderTimer = 0;
   function scheduleRender() { if (!renderTimer) renderTimer = setTimeout(() => { renderTimer = 0; render(); }, 0); }
@@ -1221,13 +1262,56 @@
   function render() {
     if (!room) { show('home'); $('overlay').hidden = true; return; }
     const inRound = S && S.phase === 'playing' && S.round && S.round.order.includes(room.sid);
-    if (inRound) { show('game'); renderGame(); } else { show('lobby'); renderLobby(); }
+    const listed = S && S.players.some((p) => p.pid === room.sid);
+    if (inRound) { show('game'); renderGame(); }
+    else if (S && S.phase === 'over' && S.result && listed && !(isHost() && lobbyOpen)) { show('result'); renderResult(); }
+    else { show('lobby'); renderLobby(); }
     for (const d of $$('[data-dot]')) d.classList.toggle('on', netUp());
     for (const b of $$('[data-leave]')) {
       b.classList.toggle('armed', armed === 'leave');
       b.textContent = armed === 'leave' ? (isHost() ? '確定解散？' : '確定離開？') : (isHost() ? '解散' : '離開');
     }
     renderOverlay();
+  }
+
+  // 這局結果對「我」來說是贏、輸、安全（盲猜猜中），還是沒參加
+  function outcome(r) {
+    const inRound = !!(S.round && S.round.order.includes(room.sid));
+    if (r.type === 'cleared') return r.losers.includes(room.sid) ? 'lose' : inRound ? 'win' : 'none';
+    if (r.type === 'blind') return r.win ? 'safe' : r.pid === room.sid ? 'lose' : inRound ? 'win' : 'none';
+    return 'none';
+  }
+  function renderResult() {
+    const r = S.result;
+    const o = outcome(r);
+    const drinkers = r.type === 'cleared' ? r.losers : (r.type === 'blind' && !r.win ? [r.pid] : []);
+    const names = drinkers.map(rawName).join('、');
+    patch($('resStage'), JSON.stringify([r, o, names, nameOf(r.by || r.pid)]), () => {
+      const kids = [];
+      if (o === 'lose') kids.push(h('div', { class: 'res-big lose', text: '輸' }), h('div', { class: 'res-line lose', text: '喝酒！' }));
+      else if (o === 'win') kids.push(h('div', { class: 'res-big win', text: '贏' }), h('div', { class: 'res-line', text: names + ' 喝' }));
+      else if (o === 'safe') kids.push(h('div', { class: 'res-big safe', text: '安全' }), h('div', { class: 'res-line small', text: nameOf(r.pid) + '盲猜「' + r.k + '」' }));
+      else if (r.type === 'abort') kids.push(h('div', { class: 'res-big none', text: '結束' }), h('div', { class: 'res-line small', text: '人數不夠，這局提前結束' }));
+      else kids.push(h('div', { class: 'res-big none', text: '結束' }), h('div', { class: 'res-line', text: names + ' 喝' }));
+      if (r.type === 'blind') kids.push(dieEl(r.value, true));
+      const detail = r.type === 'cleared' ? nameOf(r.by) + '喊「' + r.k + '」'
+        : r.type === 'blind' ? (o === 'safe' ? '' : nameOf(r.pid) + '盲猜「' + r.k + '」，') + '開出 ' + r.value + ' 點，' + (r.win ? '猜中了' : '猜錯了')
+        : '';
+      if (detail) kids.push(h('div', { class: 'res-detail', text: detail }));
+      return kids;
+    });
+    const again = $('againBtn'), orderBtn = $('orderBtn'), msg = $('resMsg');
+    if (isHost()) {
+      const n = S.players.filter((p) => online(p.pid)).length;
+      again.hidden = false;
+      orderBtn.hidden = false;
+      again.disabled = n < 2;
+      msg.textContent = n < 2 ? '至少要 2 個人在線才能開始' : '';
+    } else {
+      again.hidden = true;
+      orderBtn.hidden = true;
+      msg.textContent = !online(S.host) ? '房主離線中，等房主回來…' : '等房主開下一局';
+    }
   }
 
   function dieEl(v, big) {
@@ -1421,6 +1505,8 @@
   $('codeIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });
   $('nameIn').value = store.get('hhds.name') || '';
   $('startBtn').addEventListener('click', hostStart);
+  $('againBtn').addEventListener('click', hostStart);
+  $('orderBtn').addEventListener('click', () => { lobbyOpen = true; render(); });
 
   $('calls').addEventListener('click', (e) => {
     const b = e.target.closest('.call');
