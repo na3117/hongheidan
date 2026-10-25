@@ -518,9 +518,9 @@
       <dt>小</dt><dd>1、2、3</dd>
     </dl>
     <ul>
-      <li>一個人開房，其他人輸入房號加入，2～8 人。房主排好順序、選誰先喊，按「開始」。</li>
+      <li>一個人開房，其他人輸入房號加入，2～8 人。房主排好輪流順序，按「開始」。</li>
       <li>每人手機搖 5 顆，按住骰盅偷看，別給人看到。剩最後 1 顆時不能看。</li>
-      <li>照順序輪流喊，只有輪到的人能按。按下去後，<b>所有人</b>符合的骰子自動拿掉，剩下的重搖。可以喊重複的條件。</li>
+      <li>每局一開始大家都能按，<b>誰先按誰先喊</b>。之後照順序從他的下一位輪下去，只有輪到的人能按。按下去後，<b>所有人</b>符合的骰子自動拿掉，剩下的重搖。可以喊重複的條件。</li>
       <li>有人骰子被拿光就要喝，這局結束。同時被拿光的人一起喝。</li>
       <li>只剩 1 顆的人，輪到自己時可以改按「盲猜」：骰子重搖不給看，選一個條件開骰，猜中安全、猜錯喝，這局結束。</li>
       <li>有人斷線（鎖螢幕、切到別的 App）會全部暫停，等他回來。房主可以把一直沒回來的人移出房間。</li>
@@ -873,7 +873,7 @@
     }
     prevPlayers = new Set(ids);
     const fx = syncRound();
-    if (pendingAct && actDone(pendingAct.a)) { pendingAct = null; }
+    settlePending();
     effects(fx);
     if (S.phase !== 'playing' || !S.round || S.round.turn !== room.sid) $('guessSheet').hidden = true;
     render();
@@ -977,7 +977,6 @@
     if (idx < 0 || pid === S.host) return;
     S.players.splice(idx, 1);
     S.removed = (S.removed || []).concat(pid).slice(-50);
-    if (S.starter === pid) S.starter = S.host;
     const R = S.round;
     if (S.phase === 'playing' && R && R.order.includes(pid)) {
       const oi = R.order.indexOf(pid);
@@ -996,11 +995,14 @@
   }
   function validTurnAct(a) {
     const R = S.round;
-    return S.phase === 'playing' && R && a.roundId === R.id && a.seq === R.seq && a.pid === R.turn && !R.pending && SETS[a.k] && !pausedNow();
+    if (S.phase !== 'playing' || !R || a.roundId !== R.id || a.seq !== R.seq || R.pending || !SETS[a.k] || pausedNow()) return false;
+    // 開局時誰先按誰先喊；之後只有輪到的人能按
+    return R.turn == null ? R.seq === 0 && R.order.includes(a.pid) : a.pid === R.turn;
   }
   function hostCall(a) {
     if (!validTurnAct(a)) return;
     const R = S.round;
+    if (R.turn == null) R.turn = a.pid; // 搶到第一個喊
     R.seq += 1;
     R.last = { seq: R.seq, k: a.k, by: a.pid };
     R.pending = true; // 等每個人回報拿完剩幾顆
@@ -1016,7 +1018,6 @@
     if (value < 1 || value > 6) return;
     S.phase = 'over';
     S.result = { type: 'blind', roundId: R.id, pid: a.pid, k: a.k, value, win: SETS[a.k].includes(value) };
-    S.starter = a.pid;
     hostCommit();
   }
   function hostCheckPending() {
@@ -1032,7 +1033,6 @@
     if (losers.length) {
       S.phase = 'over';
       S.result = { type: 'cleared', roundId: R.id, losers, by: R.last.by, k: R.last.k };
-      S.starter = losers[0];
     } else {
       const i = R.order.indexOf(R.last.by);
       R.turn = i >= 0 ? R.order[(i + 1) % R.order.length] : R.turn;
@@ -1043,8 +1043,8 @@
     if (!S || S.phase === 'playing') return;
     const order = S.players.map((p) => p.pid).filter((pid) => online(pid));
     if (order.length < 2) return;
-    const starter = order.includes(S.starter) ? S.starter : order[0];
-    S.round = { id: (S.round ? S.round.id : 0) + 1, order, turn: starter, seq: 0, last: null, pending: false,
+    // turn 是 null：還沒有人喊，誰先按誰先喊
+    S.round = { id: (S.round ? S.round.id : 0) + 1, order, turn: null, seq: 0, last: null, pending: false,
       counts: Object.fromEntries(order.map((pid) => [pid, 5])) };
     S.phase = 'playing';
     S.result = null;
@@ -1057,7 +1057,6 @@
     [S.players[i], S.players[j]] = [S.players[j], S.players[i]];
     hostCommit();
   }
-  function hostSetStarter(pid) { if (S.starter !== pid) { S.starter = pid; hostCommit(); } }
   function hostSyncOff() {
     if (!S) return;
     const off = S.players.filter((p) => p.pid !== S.host && !online(p.pid)).map((p) => p.pid);
@@ -1081,12 +1080,23 @@
   function actDone(a) {
     const R = S && S.round;
     if (!R || R.id !== a.roundId || S.phase !== 'playing') return true;
-    return R.seq !== a.seq || R.turn !== a.pid;
+    return R.seq !== a.seq || (R.turn != null && R.turn !== a.pid);
+  }
+  // 送出的動作有結果了；開局搶先慢了一步的話告訴他
+  function settlePending() {
+    if (!pendingAct || !actDone(pendingAct.a)) return;
+    const a = pendingAct.a;
+    const R = S && S.round;
+    pendingAct = null;
+    if (a.type === 'call' && R && R.id === a.roundId && R.last && R.last.seq === a.seq + 1 && R.last.by !== room.sid) {
+      toast('慢了一步，' + rawName(R.last.by) + '先喊了');
+    }
   }
   function canAct() {
     if (!S || !room || S.phase !== 'playing' || !S.round) return false;
     const R = S.round;
-    return R.turn === room.sid && !R.pending && !pendingAct && netUp() && !pausedNow()
+    const myTurn = R.turn === room.sid || (R.turn == null && R.seq === 0 && R.order.includes(room.sid));
+    return myTurn && !R.pending && !pendingAct && netUp() && !pausedNow()
       && my && my.roundId === R.id && my.seq === R.seq && my.dice.length > 0;
   }
 
@@ -1149,7 +1159,7 @@
     const sid = rid(8);
     room = { code, sid, name, host: true };
     store.set('hhds.room', room);
-    S = { v: 1, ts: Date.now(), code, host: sid, players: [{ pid: sid, name }], phase: 'lobby', round: null, result: null, starter: sid, removed: [] };
+    S = { v: 1, ts: Date.now(), code, host: sid, players: [{ pid: sid, name }], phase: 'lobby', round: null, result: null, removed: [] };
     store.set(hostKey(), S);
     homeMsg('');
     enterRoom();
@@ -1265,7 +1275,7 @@
     // 玩家名單
     const host = isHost();
     const editing = host && S.phase !== 'playing';
-    $('listHint').textContent = editing ? '調整順序、選誰先喊' : (S.players.length + ' / ' + MAX_PLAYERS + ' 人');
+    $('listHint').textContent = editing ? '調整輪流順序' : (S.players.length + ' / ' + MAX_PLAYERS + ' 人');
     const rows = S.players.map((p, i) => {
       const on = online(p.pid);
       let st = '';
@@ -1274,7 +1284,7 @@
       else if (S.phase === 'playing') st = '剩 ' + countText(p.pid) + ' 顆';
       return { p, i, on, st };
     });
-    const sig = JSON.stringify([rows.map((r) => [r.p.pid, r.p.name, r.on, r.st]), S.starter, S.phase, editing, armed]);
+    const sig = JSON.stringify([rows.map((r) => [r.p.pid, r.p.name, r.on, r.st]), S.phase, editing, armed]);
     patch($('players'), sig, () => rows.map(({ p, i, on, st }) => {
       const me = p.pid === room.sid;
       const isH = p.pid === S.host;
@@ -1284,12 +1294,10 @@
           h('span', { class: 'pl-name', text: p.name }),
           me && h('span', { class: 'tag', text: '你' }),
           isH && h('span', { class: 'tag brass', text: '房主' }),
-          S.phase !== 'playing' && S.starter === p.pid && h('span', { class: 'tag red', text: '先喊' }),
           h('span', { class: 'pl-st', text: st })),
         editing && h('div', { class: 'pl-ctl' },
           h('button', { class: 'mini', type: 'button', disabled: i === 0, 'aria-label': '往前移', onclick: () => hostMove(p.pid, -1), text: '▲' }),
           h('button', { class: 'mini', type: 'button', disabled: i === S.players.length - 1, 'aria-label': '往後移', onclick: () => hostMove(p.pid, 1), text: '▼' }),
-          h('button', { class: 'mini' + (S.starter === p.pid ? ' on' : ''), type: 'button', onclick: () => hostSetStarter(p.pid), text: '先喊' }),
           !isH && h('button', { class: 'mini warn' + (armed === 'rm:' + p.pid ? ' armed' : ''), type: 'button', onclick: () => { if (arm('rm:' + p.pid)) hostRemove(p.pid); }, text: armed === 'rm:' + p.pid ? '確定移出？' : '移出' })));
     }));
     // 底部
@@ -1299,7 +1307,7 @@
       startBtn.hidden = false;
       startBtn.textContent = S.round ? '再來一局' : '開始';
       startBtn.disabled = S.phase === 'playing' || n < 2;
-      lobbyMsg.textContent = S.phase === 'playing' ? '' : n < 2 ? '至少要 2 個人在線才能開始' : '按「先喊」選誰先喊，' + (S.round ? '再按再來一局' : '再按開始');
+      lobbyMsg.textContent = S.phase === 'playing' ? '' : n < 2 ? '至少要 2 個人在線才能開始' : '按「' + (S.round ? '再來一局' : '開始') + '」後，誰先按誰先喊';
     } else {
       startBtn.hidden = true;
       lobbyMsg.textContent = !listed ? '加入房間中…'
@@ -1310,7 +1318,7 @@
     }
   }
 
-  let diceKey = '';
+  let diceKey = '', lastRenderOpen = false;
   function renderGame() {
     const R = S.round;
     const n = my && my.roundId === R.id ? my.dice.length : 0;
@@ -1326,10 +1334,13 @@
       h('span', { class: 'opp-n', text: countText(pid) }))));
     // 輪到誰
     const tl = $('turnLine');
-    const mine = R.turn === room.sid && !R.pending;
+    const open = R.turn == null && !R.pending;
+    lastRenderOpen = open;
+    const mine = open || (R.turn === room.sid && !R.pending);
     tl.classList.toggle('mine', mine && !pendingAct);
     tl.textContent = R.pending ? '大家拿骰子中…'
       : pendingAct ? '送出中…'
+      : open ? '誰先按誰先喊！'
       : mine ? (n === 1 ? '輪到你！喊一個，或按盲猜' : '輪到你喊！')
       : '輪到 ' + rawName(R.turn) + ' 喊';
     // 上一個動作
@@ -1413,7 +1424,12 @@
 
   $('calls').addEventListener('click', (e) => {
     const b = e.target.closest('.call');
-    if (!b || b.disabled || !canAct()) return;
+    if (!b || b.disabled) return;
+    if (!canAct()) {
+      const R = S && S.round;
+      if (lastRenderOpen && R && R.last && R.last.by !== room.sid) toast('慢了一步，' + rawName(R.last.by) + '先喊了');
+      return;
+    }
     sendAct({ type: 'call', roundId: S.round.id, seq: S.round.seq, k: b.dataset.k });
   });
 
@@ -1506,7 +1522,7 @@
     if (S && !isHost()) {
       if (!S.players.some((p) => p.pid === room.sid)) maybeJoin();
       if (pendingAct) {
-        if (actDone(pendingAct.a)) pendingAct = null;
+        if (actDone(pendingAct.a)) settlePending();
         else if (now - pendingAct.at > 2500) {
           if (pendingAct.tries >= 4) {
             pendingAct = null;
