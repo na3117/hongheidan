@@ -1,0 +1,1529 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>紅黑單雙</title>
+<meta name="description" content="每人一支手機當骰盅的紅黑單雙，開房連線一起玩">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="紅黑單雙">
+<meta name="theme-color" content="#1c0b0d">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Noto+Serif+TC:wght@900&display=swap">
+<style>
+  /* 單一主題：漆器骰盅的深酒紅底 */
+  :root {
+    color-scheme: dark;
+    --ground: #1c0b0d;
+    --ground-2: #2a1114;
+    --ground-3: #3a1a1c;
+    --lacquer: #7a1620;
+    --brass: #d9a441;
+    --brass-dim: #8f6a2a;
+    --ivory: #f4ede0;
+    --ivory-shade: #d9cfbd;
+    --pip-red: #c8102e;
+    --pip-black: #1a1a1a;
+    --ink: #f4ede0;
+    --ink-dim: #b89c93;
+    --good: #5fbf7a;
+    --bad: #ff6b5e;
+    --display: "Noto Serif TC", "Songti TC", serif;
+    --body: "Noto Sans TC", -apple-system, "PingFang TC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(120% 70% at 50% 30%, var(--ground-2), var(--ground) 70%);
+    background-color: var(--ground);
+    color: var(--ink);
+    font: 15px/1.5 var(--body);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  }
+  input { -webkit-user-select: text; user-select: text; }
+  button { font-family: var(--body); }
+
+  .screen {
+    height: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    padding-inline: 16px;
+    padding-block: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+  }
+
+  /* ---------- 共用按鈕 ---------- */
+  .ghost {
+    font: 700 14px/1 var(--body);
+    color: var(--ink-dim);
+    background: none;
+    border: 1px solid color-mix(in srgb, var(--brass) 35%, transparent);
+    border-radius: 999px;
+    padding: 9px 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .ghost.armed { color: var(--ground); background: var(--brass); border-color: var(--brass); }
+  .primary {
+    appearance: none;
+    border: 0;
+    border-radius: 16px;
+    padding: 15px 14px;
+    font: 900 18px/1 var(--body);
+    letter-spacing: .12em;
+    color: var(--ground);
+    background: linear-gradient(var(--brass), #b8862e);
+    box-shadow: 0 3px 0 var(--brass-dim);
+    cursor: pointer;
+  }
+  .primary.alt { background: var(--lacquer); color: var(--ivory); box-shadow: 0 3px 0 #4a0c12; }
+  .primary:disabled { opacity: .4; cursor: default; }
+  .primary:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--brass-dim); }
+  .ghost:focus-visible, .call:focus-visible, .primary:focus-visible, .mini:focus-visible, .cup-zone:focus-visible, input:focus-visible {
+    outline: 2px solid var(--brass); outline-offset: 3px;
+  }
+  .msg { min-height: 1.5em; margin: 0; text-align: center; color: var(--ink-dim); font-size: 14px; }
+  .msg.err { color: var(--bad); }
+
+  /* ---------- 首頁 ---------- */
+  .home { justify-content: center; gap: 14px; }
+  .brand { text-align: center; display: grid; gap: 4px; margin-bottom: 10px; }
+  .brand img { width: 76px; height: 76px; border-radius: 18px; margin: 0 auto 6px; box-shadow: 0 10px 24px rgba(0,0,0,.45); }
+  .title { font-family: var(--display); font-weight: 900; font-size: 44px; letter-spacing: .12em; margin: 0; color: var(--brass); line-height: 1.1; }
+  .tag-line { margin: 0; color: var(--ink-dim); letter-spacing: .1em; font-size: 14px; }
+  .field { display: grid; gap: 6px; }
+  .field span { font-size: 13px; color: var(--ink-dim); letter-spacing: .08em; }
+  .input {
+    width: 100%;
+    font: 700 18px/1.2 var(--body);
+    color: var(--ink);
+    background: var(--ground-2);
+    border: 1px solid color-mix(in srgb, var(--brass) 30%, transparent);
+    border-radius: 14px;
+    padding: 13px 14px;
+  }
+  .input::placeholder { color: color-mix(in srgb, var(--ink-dim) 70%, transparent); font-weight: 500; }
+  .or { display: flex; align-items: center; gap: 10px; color: var(--ink-dim); font-size: 13px; letter-spacing: .08em; margin-top: 6px; }
+  .or::before, .or::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--brass) 25%, transparent); }
+  .join-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+  .join-row .input { letter-spacing: .3em; font-variant-numeric: tabular-nums; text-align: center; }
+  .join-row .primary { padding-inline: 22px; }
+  .home-foot { display: flex; justify-content: center; }
+
+  /* ---------- 頂列 ---------- */
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .bar-btns { display: flex; gap: 6px; }
+  .room-chip { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--ink-dim); white-space: nowrap; }
+  .room-chip b { color: var(--ivory); font-size: 16px; letter-spacing: .12em; font-variant-numeric: tabular-nums; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #c9902e; box-shadow: 0 0 0 3px color-mix(in srgb, #c9902e 25%, transparent); }
+  .dot.on { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent); }
+
+  /* ---------- 房間大廳 ---------- */
+  .code-card {
+    text-align: center;
+    padding: 16px 12px 14px;
+    border-radius: 20px;
+    background: var(--ground-2);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brass) 22%, transparent);
+  }
+  .code-label { font-size: 13px; letter-spacing: .2em; color: var(--ink-dim); }
+  .code-big { font: 900 64px/1.05 var(--body); letter-spacing: .14em; color: var(--brass); font-variant-numeric: tabular-nums; padding-left: .14em; }
+  .code-card p { margin: 6px 0 0; font-size: 13px; color: var(--ink-dim); }
+  .code-card .url { color: var(--ivory); -webkit-user-select: all; user-select: all; word-break: break-all; }
+
+  .result-card {
+    border-radius: 20px;
+    padding: 16px;
+    background: linear-gradient(160deg, #3a1418, #24090c);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 35%, transparent);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .result-card.safe { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--good) 40%, transparent); }
+  .res-text { display: grid; gap: 2px; min-width: 0; }
+  .res-word { font-family: var(--display); font-weight: 900; font-size: 44px; line-height: 1; letter-spacing: .08em; }
+  .res-who { font-size: 17px; font-weight: 700; color: var(--ivory); }
+  .res-sub { font-size: 14px; color: var(--ink-dim); }
+  .good { color: var(--good); }
+  .bad { color: var(--bad); }
+
+  .list-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .list-head h2 { margin: 0; font-family: var(--display); font-weight: 900; font-size: 20px; letter-spacing: .1em; color: var(--brass); }
+  .list-head span { font-size: 12px; color: var(--ink-dim); text-align: right; }
+  .players { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .pl {
+    background: var(--ground-2);
+    border-radius: 14px;
+    padding: 10px 12px;
+    display: grid;
+    gap: 8px;
+  }
+  .pl.off { opacity: .55; }
+  .pl-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .pl-num { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 900; color: var(--ground); background: var(--ink-dim); flex: none; }
+  .pl-name { font-weight: 700; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .tag { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--ground-3); color: var(--ink-dim); flex: none; letter-spacing: .05em; }
+  .tag.brass { background: color-mix(in srgb, var(--brass) 22%, transparent); color: var(--brass); }
+  .tag.red { background: color-mix(in srgb, var(--pip-red) 30%, transparent); color: #ff9a9a; }
+  .pl-st { margin-left: auto; font-size: 13px; color: var(--ink-dim); flex: none; font-variant-numeric: tabular-nums; }
+  .pl-ctl { display: flex; gap: 6px; flex-wrap: wrap; padding-left: 30px; }
+  .mini {
+    font: 700 13px/1 var(--body);
+    color: var(--ink);
+    background: var(--ground-3);
+    border: 0;
+    border-radius: 10px;
+    padding: 9px 12px;
+    cursor: pointer;
+  }
+  .mini:disabled { opacity: .3; cursor: default; }
+  .mini.on { background: var(--pip-red); color: var(--ivory); }
+  .mini.warn { margin-left: auto; color: #ff9a9a; }
+  .mini.warn.armed { background: var(--bad); color: var(--ground); }
+  .lobby-foot { display: grid; gap: 8px; margin-top: auto; padding-top: 4px; }
+
+  /* ---------- 遊戲畫面 ---------- */
+  .status-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .mine { display: flex; align-items: baseline; gap: 6px; flex: none; }
+  .count-num { font-family: var(--display); font-size: 64px; line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--ivory); transition: transform .25s; }
+  .count-num.bump { transform: scale(1.15); }
+  .count-label { font-size: 15px; color: var(--ink-dim); font-weight: 700; letter-spacing: .1em; }
+  .opps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px 12px; min-width: 0; max-width: 64%; }
+  .opps.two { grid-template-columns: 1fr 1fr; }
+  .opp { display: flex; align-items: baseline; justify-content: flex-end; gap: 8px; font-size: 14px; min-width: 0; padding: 2px 8px; border-radius: 999px; }
+  .opp-name { color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .opp-n { font-weight: 900; font-size: 17px; color: var(--ivory); font-variant-numeric: tabular-nums; flex: none; min-width: 1ch; text-align: right; }
+  .opp.turn { background: color-mix(in srgb, var(--brass) 22%, transparent); }
+  .opp.turn .opp-name { color: var(--brass); }
+  .opp.off { opacity: .45; }
+  .opp.off .opp-n::after { content: " 離線"; font-size: 11px; font-weight: 700; color: var(--bad); }
+
+  .turn {
+    text-align: center;
+    font-weight: 900;
+    font-size: 17px;
+    letter-spacing: .08em;
+    padding: 8px 12px;
+    border-radius: 999px;
+    color: var(--ink-dim);
+    background: var(--ground-2);
+  }
+  .turn.mine { color: var(--ground); background: var(--brass); animation: glow 1.6s ease-in-out infinite; }
+  @keyframes glow { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--brass) 25%, transparent); } }
+
+  .cup-zone {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 150px;
+    border-radius: 24px;
+    background: radial-gradient(80% 60% at 50% 55%, var(--ground-3), #220c0f 80%);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brass) 18%, transparent), inset 0 20px 50px rgba(0,0,0,.5);
+    overflow: hidden;
+    touch-action: none;
+    cursor: pointer;
+  }
+  .dice {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px;
+    visibility: hidden;
+  }
+  .cup-zone.peek .dice { visibility: visible; }
+  .die {
+    width: 54px;
+    aspect-ratio: 1;
+    max-width: 100%;
+    border-radius: 12px;
+    background: linear-gradient(145deg, var(--ivory), var(--ivory-shade));
+    box-shadow: 0 4px 0 #b3a794, 0 8px 14px rgba(0,0,0,.45);
+    display: grid;
+    grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+    padding: 8px;
+    flex: none;
+  }
+  .die span { display: grid; }
+  .die i { width: 10px; height: 10px; border-radius: 50%; place-self: center; background: var(--pip-black); box-shadow: inset 0 1px 1px rgba(0,0,0,.5); }
+  .die.red i { background: var(--pip-red); }
+  .die.one i { width: 18px; height: 18px; }
+  .die.big { width: 84px; border-radius: 18px; padding: 12px; }
+  .die.big i { width: 15px; height: 15px; }
+  .die.big.one i { width: 26px; height: 26px; }
+  .die.rolling { animation: tumble .45s ease-out; }
+  @keyframes tumble {
+    0% { transform: translateY(-30px) rotate(-120deg) scale(.7); opacity: 0; }
+    70% { transform: translateY(4px) rotate(10deg); opacity: 1; }
+    100% { transform: none; }
+  }
+  .cup {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(80% 60% at 50% 55%, var(--ground-3), #220c0f 80%);
+    transition: transform .28s cubic-bezier(.3,.7,.3,1);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .cup svg { width: min(70%, 250px); max-height: 88%; height: auto; filter: drop-shadow(0 18px 24px rgba(0,0,0,.55)); }
+  .cup-zone.peek .cup { transform: translateY(-105%); }
+  .cup-zone.shaking .cup { animation: shake .5s; }
+  @keyframes shake {
+    0%,100% { transform: none; }
+    20% { transform: translateX(-10px) rotate(-4deg); }
+    40% { transform: translateX(10px) rotate(4deg); }
+    60% { transform: translateX(-7px) rotate(-2deg); }
+    80% { transform: translateX(6px) rotate(2deg); }
+  }
+  .hint { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; font-size: 13px; color: var(--ink-dim); letter-spacing: .12em; pointer-events: none; z-index: 3; }
+  .cup-zone.peek .hint { opacity: 0; }
+  .banner { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px; text-align: center; padding: 16px; z-index: 4; }
+  .banner .big-word { font-family: var(--display); font-weight: 900; font-size: 60px; line-height: 1; letter-spacing: .1em; }
+  .banner .sub { color: var(--ink-dim); font-size: 15px; }
+
+  .log { min-height: 1.5em; text-align: center; font-size: 15px; color: var(--ink-dim); }
+  .log b { color: var(--ivory); }
+
+  .calls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .call {
+    appearance: none;
+    border: 0;
+    border-radius: 16px;
+    padding: 11px 4px 9px;
+    background: var(--ground-2);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brass) 28%, transparent), 0 3px 0 #0e0506;
+    color: var(--ink);
+    display: grid;
+    gap: 2px;
+    justify-items: center;
+    cursor: pointer;
+    transition: transform .08s, opacity .2s;
+  }
+  .call:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 0 0 1px var(--brass), 0 1px 0 #0e0506; }
+  .call:disabled { opacity: .3; cursor: default; }
+  .call .w { font-family: var(--display); font-weight: 900; font-size: 30px; line-height: 1.1; }
+  .call .n { font-size: 12px; color: var(--ink-dim); letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+  .call.hong .w { color: var(--pip-red); text-shadow: 0 0 1px #ff8a8a; }
+  .call.hei .w { color: var(--ivory); }
+  .bottom { display: flex; gap: 10px; }
+  .bottom .primary { flex: 1; }
+
+  /* ---------- 面板 ---------- */
+  .sheet { position: fixed; inset: 0; background: rgba(10, 3, 4, .78); display: grid; align-items: end; z-index: 20; }
+  .sheet-body {
+    max-width: 480px;
+    width: 100%;
+    margin: 0 auto;
+    background: var(--ground-2);
+    border-radius: 24px 24px 0 0;
+    padding: 22px 16px calc(22px + env(safe-area-inset-bottom, 0px));
+    display: grid;
+    gap: 14px;
+    max-height: 88%;
+    overflow-y: auto;
+    box-shadow: 0 -1px 0 color-mix(in srgb, var(--brass) 40%, transparent);
+  }
+  .sheet h2 { font-family: var(--display); font-weight: 900; font-size: 24px; margin: 0; color: var(--brass); letter-spacing: .08em; }
+  .sheet p, .sheet li { font-size: 15px; line-height: 1.7; color: var(--ink); margin: 0; }
+  .sheet ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+  .defs { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 15px; margin: 0; }
+  .defs dt { font-family: var(--display); font-weight: 900; color: var(--brass); }
+  .defs dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .guess-stage { display: grid; place-items: center; min-height: 110px; }
+  .mystery { width: 84px; aspect-ratio: 1; border-radius: 18px; background: var(--lacquer); display: grid; place-items: center; font: 900 40px/1 var(--display); color: var(--brass); box-shadow: 0 5px 0 #4a0c12; }
+
+  .overlay { position: fixed; inset: 0; z-index: 15; background: rgba(10, 3, 4, .72); display: grid; place-items: center; padding: 16px; }
+  .ov-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--ground-2);
+    border-radius: 22px;
+    padding: 22px 18px;
+    display: grid;
+    gap: 10px;
+    text-align: center;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brass) 35%, transparent), 0 20px 40px rgba(0,0,0,.5);
+  }
+  .ov-title { font-family: var(--display); font-weight: 900; font-size: 30px; letter-spacing: .14em; color: var(--brass); }
+  .ov-card p { margin: 0; }
+  .ov-card .sub { font-size: 13px; color: var(--ink-dim); }
+  .ov-card b { color: var(--ivory); }
+  .ov-btns { display: grid; gap: 8px; margin-top: 4px; }
+  .ov-btns .primary { font-size: 16px; padding: 13px; }
+  .ov-btns .primary.armed { background: var(--bad); color: var(--ground); box-shadow: none; }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    transform: translateX(-50%);
+    z-index: 30;
+    background: var(--ivory);
+    color: var(--ground);
+    font-weight: 700;
+    font-size: 14px;
+    padding: 9px 16px;
+    border-radius: 999px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.4);
+    max-width: calc(100% - 32px);
+    text-align: center;
+    pointer-events: none;
+    transition: opacity .3s;
+  }
+  .toast.hide { opacity: 0; }
+
+  @media (max-height: 640px) {
+    .screen { gap: 9px; padding-block: 8px 12px; }
+    .count-num { font-size: 48px; }
+    .call { padding: 7px 4px 6px; }
+    .call .w { font-size: 24px; }
+    .die { width: 44px; padding: 7px; }
+    .die i { width: 8px; height: 8px; }
+    .die.one i { width: 15px; height: 15px; }
+    .code-big { font-size: 48px; }
+    .title { font-size: 36px; }
+    .turn { padding: 6px 10px; font-size: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== 首頁 ========== -->
+<section class="screen home" id="home">
+  <div class="brand">
+    <img src="apple-touch-icon.png" alt="">
+    <h1 class="title">紅黑單雙</h1>
+    <p class="tag-line">每人一支手機當骰盅</p>
+  </div>
+  <label class="field" for="nameIn"><span>你的暱稱</span>
+    <input class="input" id="nameIn" maxlength="8" autocomplete="nickname" enterkeyhint="done" placeholder="例如：阿明">
+  </label>
+  <button class="primary" id="createBtn" type="button">開房</button>
+  <div class="or">或加入朋友的房間</div>
+  <div class="join-row">
+    <input class="input" id="codeIn" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" enterkeyhint="go" placeholder="4 碼房號" aria-label="房號">
+    <button class="primary alt" id="joinBtn" type="button">加入</button>
+  </div>
+  <p class="msg" id="homeMsg"></p>
+  <div class="home-foot"><button class="ghost" type="button" data-rules>玩法說明</button></div>
+</section>
+
+<!-- ========== 房間大廳 ========== -->
+<section class="screen lobby" id="lobby" hidden>
+  <header class="bar">
+    <div class="room-chip"><span class="dot" data-dot></span>房號 <b data-code>----</b></div>
+    <div class="bar-btns">
+      <button class="ghost" type="button" data-mute aria-label="音效開關">🔊</button>
+      <button class="ghost" type="button" data-rules>規則</button>
+      <button class="ghost" type="button" data-leave>離開</button>
+    </div>
+  </header>
+  <div class="code-card">
+    <div class="code-label">房號</div>
+    <div class="code-big" data-code>----</div>
+    <p>朋友打開 <span class="url" id="siteUrl"></span>，輸入房號就能加入</p>
+  </div>
+  <div class="result-card" id="resultCard" hidden></div>
+  <div class="list-head"><h2>玩家</h2><span id="listHint"></span></div>
+  <ol class="players" id="players"></ol>
+  <div class="lobby-foot">
+    <button class="primary" id="startBtn" type="button" hidden>開始</button>
+    <p class="msg" id="lobbyMsg"></p>
+  </div>
+</section>
+
+<!-- ========== 遊戲 ========== -->
+<section class="screen game" id="game" hidden>
+  <header class="bar">
+    <div class="room-chip"><span class="dot" data-dot></span>房號 <b data-code>----</b></div>
+    <div class="bar-btns">
+      <button class="ghost" type="button" data-mute aria-label="音效開關">🔊</button>
+      <button class="ghost" type="button" data-rules>規則</button>
+      <button class="ghost" type="button" data-leave>離開</button>
+    </div>
+  </header>
+  <div class="status-row">
+    <div class="mine"><span class="count-num" id="count">5</span><span class="count-label">顆</span></div>
+    <ul class="opps" id="opps" aria-label="其他人剩幾顆"></ul>
+  </div>
+  <div class="turn" id="turnLine"></div>
+  <div class="cup-zone" id="zone" tabindex="0" role="button" aria-label="按住偷看自己的骰子">
+    <div class="dice" id="dice"></div>
+    <div class="cup" id="cup">
+      <svg viewBox="0 0 240 200" aria-hidden="true">
+        <defs>
+          <linearGradient id="lq" x1="0" x2="1">
+            <stop offset="0" stop-color="#4a0c12"/>
+            <stop offset=".35" stop-color="#a8242f"/>
+            <stop offset=".55" stop-color="#c23440"/>
+            <stop offset="1" stop-color="#5a0f16"/>
+          </linearGradient>
+        </defs>
+        <path d="M58 20 Q120 4 182 20 L214 176 Q120 196 26 176 Z" fill="url(#lq)"/>
+        <ellipse cx="120" cy="20" rx="62" ry="12" fill="#5a0f16"/>
+        <ellipse cx="120" cy="18" rx="22" ry="6" fill="#d9a441"/>
+        <path d="M30 160 Q120 180 210 160" stroke="#d9a441" stroke-width="4" fill="none"/>
+        <path d="M36 140 Q120 158 204 140" stroke="#d9a441" stroke-width="1.5" fill="none" opacity=".6"/>
+        <text x="120" y="112" text-anchor="middle" font-family="Noto Serif TC, serif" font-weight="900" font-size="44" fill="#d9a441">骰</text>
+      </svg>
+    </div>
+    <div class="hint" id="hint">按住偷看 · 放開蓋回</div>
+    <div class="banner" id="banner" hidden></div>
+  </div>
+  <div class="log" id="log"></div>
+  <div class="calls" id="calls">
+    <button class="call hong" type="button" data-k="紅"><span class="w">紅</span><span class="n">1 · 4</span></button>
+    <button class="call hei" type="button" data-k="黑"><span class="w">黑</span><span class="n">2 3 5 6</span></button>
+    <button class="call" type="button" data-k="單"><span class="w">單</span><span class="n">1 3 5</span></button>
+    <button class="call" type="button" data-k="雙"><span class="w">雙</span><span class="n">2 4 6</span></button>
+    <button class="call" type="button" data-k="大"><span class="w">大</span><span class="n">4 5 6</span></button>
+    <button class="call" type="button" data-k="小"><span class="w">小</span><span class="n">1 2 3</span></button>
+  </div>
+  <div class="bottom"><button class="primary" id="guessBtn" type="button" hidden>最後一顆 · 盲猜</button></div>
+</section>
+
+<!-- ========== 規則 ========== -->
+<div class="sheet" id="rulesSheet" hidden>
+  <div class="sheet-body">
+    <h2>玩法</h2>
+    <dl class="defs">
+      <dt>紅</dt><dd>1、4</dd>
+      <dt>黑</dt><dd>2、3、5、6</dd>
+      <dt>單</dt><dd>1、3、5</dd>
+      <dt>雙</dt><dd>2、4、6</dd>
+      <dt>大</dt><dd>4、5、6</dd>
+      <dt>小</dt><dd>1、2、3</dd>
+    </dl>
+    <ul>
+      <li>一個人開房，其他人輸入房號加入，2～8 人。房主排好順序、選誰先喊，按「開始」。</li>
+      <li>每人手機搖 5 顆，按住骰盅偷看，別給人看到。剩最後 1 顆時不能看。</li>
+      <li>照順序輪流喊，只有輪到的人能按。按下去後，<b>所有人</b>符合的骰子自動拿掉，剩下的重搖。可以喊重複的條件。</li>
+      <li>有人骰子被拿光就要喝，這局結束。同時被拿光的人一起喝。</li>
+      <li>只剩 1 顆的人，輪到自己時可以改按「盲猜」：骰子重搖不給看，選一個條件開骰，猜中安全、猜錯喝，這局結束。</li>
+      <li>有人斷線（鎖螢幕、切到別的 App）會全部暫停，等他回來。房主可以把一直沒回來的人移出房間。</li>
+    </ul>
+    <button class="primary" type="button" id="rulesClose">知道了</button>
+  </div>
+</div>
+
+<!-- ========== 盲猜 ========== -->
+<div class="sheet" id="guessSheet" hidden>
+  <div class="sheet-body">
+    <h2>盲猜</h2>
+    <p id="guessMsg">骰子會重搖，誰都看不到。猜它是：</p>
+    <div class="guess-stage"><div class="mystery">？</div></div>
+    <div class="calls" id="guessCalls">
+      <button class="call hong" type="button" data-k="紅"><span class="w">紅</span><span class="n">1 · 4</span></button>
+      <button class="call hei" type="button" data-k="黑"><span class="w">黑</span><span class="n">2 3 5 6</span></button>
+      <button class="call" type="button" data-k="單"><span class="w">單</span><span class="n">1 3 5</span></button>
+      <button class="call" type="button" data-k="雙"><span class="w">雙</span><span class="n">2 4 6</span></button>
+      <button class="call" type="button" data-k="大"><span class="w">大</span><span class="n">4 5 6</span></button>
+      <button class="call" type="button" data-k="小"><span class="w">小</span><span class="n">1 2 3</span></button>
+    </div>
+    <button class="primary alt" id="guessCancel" type="button">先不猜</button>
+  </div>
+</div>
+
+<!-- ========== 暫停 / 斷線 ========== -->
+<div class="overlay" id="overlay" hidden><div class="ov-card" id="ovCard"></div></div>
+<div class="toast hide" id="toast" role="status" aria-live="polite"></div>
+
+<script src="mqtt.min.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  // ================= 設定 =================
+  const PREFIX = 'hhds1';
+  // 兩個免費公共轉發站同時連，一個掛了另一個還能用
+  const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
+  const SETS = { 紅: [1, 4], 黑: [2, 3, 5, 6], 單: [1, 3, 5], 雙: [2, 4, 6], 大: [4, 5, 6], 小: [1, 2, 3] };
+  const PIPS = { 1: [4], 2: [2, 6], 3: [2, 4, 6], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+  const HB_MS = 3000;          // 心跳間隔
+  const ALIVE_MS = 9000;       // 多久沒心跳算離線
+  const GRACE_MS = 2500;       // 離線要持續多久才暫停（避免一閃而過）
+  const STALE_MS = 12 * 3600e3; // 超過 12 小時沒動的房間當作不存在
+  const LOOKUP_MS = 7000;      // 加入時等房間資料的時間
+  const MAX_PLAYERS = 8;
+
+  // ================= 小工具 =================
+  const $ = (id) => document.getElementById(id);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+  const store = {
+    get(k, d = null) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+    del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+  };
+  const ALPHA = 'abcdefghijkmnpqrstuvwxyz23456789';
+  const rid = (n = 8) => { const a = new Uint8Array(n); crypto.getRandomValues(a); return Array.from(a, (x) => ALPHA[x % 32]).join(''); };
+  const roll = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return (a[0] % 6) + 1; };
+  const rollN = (n) => Array.from({ length: n }, roll);
+  const cleanName = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 8);
+  const dec = new TextDecoder();
+
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    if (attrs) for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === 'class') el.className = v;
+      else if (k === 'text') el.textContent = v;
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? '' : v);
+    }
+    for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
+    return el;
+  }
+  // 內容有變才重畫，避免按鈕在手指按下時被換掉
+  function patch(el, sig, build) {
+    if (el._sig === sig) return;
+    el._sig = sig;
+    el.replaceChildren(...build());
+  }
+  let toastTimer = 0;
+  function toast(text) {
+    const t = $('toast');
+    t.textContent = text;
+    t.classList.remove('hide');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.add('hide'), 2600);
+  }
+
+  // ================= 音效（Web Audio 即時合成） =================
+  const SFX_KEY = 'hongheidan.muted';
+  let muted = store.get(SFX_KEY) === '1' || store.get(SFX_KEY) === 1;
+  let actx = null, noiseBuf = null;
+  function ac() {
+    if (muted) return null;
+    if (!actx) {
+      const C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      try { actx = new C(); } catch (e) { return null; }
+      noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    if (actx.state !== 'running') { try { actx.resume(); } catch (e) {} }
+    return actx;
+  }
+  // iPhone 要在點擊當下發過聲音才會解鎖；切回 App 後也要再叫醒一次
+  document.addEventListener('pointerdown', () => {
+    const c = ac(); if (!c) return;
+    if (!c._unlocked) {
+      const b = c.createBufferSource(); b.buffer = c.createBuffer(1, 1, 22050);
+      b.connect(c.destination); b.start(0);
+      c._unlocked = true;
+    }
+  });
+  function env(c, t, peak, dur, attack = 0.003) {
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.connect(c.destination);
+    return g;
+  }
+  function noise(c, t, dur, type, freq, q, peak) {
+    const src = c.createBufferSource(); src.buffer = noiseBuf;
+    const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    src.connect(f); f.connect(env(c, t, peak, dur));
+    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+  }
+  function tone(c, t, type, f0, f1, dur, peak) {
+    const o = c.createOscillator(); o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    o.connect(env(c, t, peak, dur)); o.start(t); o.stop(t + dur + 0.02);
+  }
+  const sfx = {
+    rattle(len = 0.5) {           // 骰子在骰盅裡碰撞
+      const c = ac(); if (!c) return;
+      const t0 = c.currentTime;
+      for (let i = 0; i < 14; i++) {
+        const t = t0 + Math.random() * len;
+        noise(c, t, 0.03, 'bandpass', 1800 + Math.random() * 2600, 6, 0.5);
+        tone(c, t, 'triangle', 1400 + Math.random() * 900, 1200, 0.025, 0.08);
+      }
+    },
+    knocks(n, delay = 0) {        // 每拿掉一顆「叩」一聲
+      const c = ac(); if (!c) return;
+      for (let i = 0; i < n; i++) {
+        const t = c.currentTime + delay + i * 0.14;
+        tone(c, t, 'sine', 820, 520, 0.09, 0.45);
+        noise(c, t, 0.02, 'bandpass', 2400, 3, 0.25);
+      }
+    },
+    thud(delay = 0) {             // 沒有要拿的
+      const c = ac(); if (!c) return;
+      tone(c, c.currentTime + delay, 'sine', 150, 70, 0.3, 0.6);
+    },
+    swish() {                     // 打開骰盅
+      const c = ac(); if (!c) return;
+      const t = c.currentTime;
+      const src = c.createBufferSource(); src.buffer = noiseBuf;
+      const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
+      f.frequency.setValueAtTime(800, t); f.frequency.exponentialRampToValueAtTime(3500, t + 0.18);
+      src.connect(f); f.connect(env(c, t, 0.25, 0.2, 0.06));
+      src.start(t); src.stop(t + 0.25);
+    },
+    denied() {                    // 最後一顆不能看
+      const c = ac(); if (!c) return;
+      const t = c.currentTime;
+      tone(c, t, 'square', 440, 440, 0.08, 0.12);
+      tone(c, t + 0.11, 'square', 330, 330, 0.12, 0.12);
+    },
+    turn(delay = 0) {             // 輪到你了
+      const c = ac(); if (!c) return;
+      const t = c.currentTime + delay;
+      tone(c, t, 'sine', 988, 988, 0.18, 0.22);
+      tone(c, t + 0.12, 'sine', 1319, 1319, 0.3, 0.2);
+    },
+    lose(delay = 0) {             // 喝！
+      const c = ac(); if (!c) return;
+      const t = c.currentTime + delay;
+      [0, 0.28, 0.56].forEach((d, i) => tone(c, t + d, 'triangle', 392 / Math.pow(1.12, i), 370 / Math.pow(1.12, i), 0.24, 0.35));
+      const o = c.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(330, t + 0.84); o.frequency.exponentialRampToValueAtTime(90, t + 1.7);
+      const lfo = c.createOscillator(); lfo.frequency.value = 7;
+      const lg = c.createGain(); lg.gain.value = 12; lfo.connect(lg); lg.connect(o.frequency);
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400;
+      o.connect(lp); lp.connect(env(c, t + 0.84, 0.3, 0.9, 0.02));
+      o.start(t + 0.84); lfo.start(t + 0.84); o.stop(t + 1.8); lfo.stop(t + 1.8);
+    },
+    win(delay = 0) {              // 猜中
+      const c = ac(); if (!c) return;
+      const t = c.currentTime + delay;
+      [659, 880, 1319].forEach((f, i) => tone(c, t + i * 0.09, 'triangle', f, f, 0.5, 0.3));
+    },
+  };
+
+  // ================= 遊戲狀態 =================
+  // room：我在哪個房間 { code, sid, name, host }；sid 是這次進房的身分
+  // S：房主發出的整局狀態；ST：每個人自己回報的剩幾顆；my：我自己的骰子（只存在這支手機）
+  let room = store.get('hhds.room');
+  let S = null, ST = {}, my = null;
+  let pendingAct = null, lastJoinAt = 0, lookupUntil = 0, firstState = true;
+  let lastLog = null, prevPlayers = null, prevTurnMine = false, prevResultKey = null;
+  let svLast = 0;
+  const nextSv = () => (svLast = Math.max(svLast + 1, Date.now()));
+  const live = { beat: [{}, {}], gone: [{}, {}], off: {} };
+  const seenMids = new Set();
+  const isHost = () => !!(room && room.host);
+  const hostKey = () => 'hhds.host.' + room.code;
+  const myKey = () => 'hhds.my.' + room.code + '.' + room.sid;
+  const rawName = (pid) => {
+    const p = S && S.players.find((p) => p.pid === pid);
+    return (p && p.name) || (ST[pid] && ST[pid].name) || '有人';
+  };
+  const nameOf = (pid) => (room && pid === room.sid ? '你' : rawName(pid));
+
+  // ================= 連線（MQTT over WebSocket） =================
+  const net = { clients: [], code: null, upAt: 0, downSince: 0, lastBeat: 0 };
+  const T = (sub) => PREFIX + '/' + net.code + '/' + sub;
+  const netUp = () => net.clients.some((x) => x.up);
+
+  function netOpen() {
+    netClose();
+    net.code = room.code;
+    net.upAt = 0;
+    net.clients = BROKERS.map((url, i) => {
+      const cid = rid(6);
+      const x = { i, url, cid, up: false, lastRx: 0, c: null };
+      x.c = mqtt.connect(url, {
+        clientId: 'hh' + rid(12),
+        keepalive: 10,
+        reconnectPeriod: 2000,
+        connectTimeout: 8000,
+        clean: true,
+        will: { topic: T('gone'), payload: JSON.stringify({ pid: room.sid, cid }), qos: 0, retain: false },
+      });
+      x.c.on('connect', () => {
+        if (!netUp()) net.upAt = Date.now();
+        x.up = true;
+        x.lastRx = Date.now();
+        if (!S && !lookupUntil) lookupUntil = Date.now() + LOOKUP_MS;
+        x.c.subscribe(PREFIX + '/' + net.code + '/#', { qos: 1 });
+        beat(x);
+        publishStatus(true, x);
+        if (isHost() && S) pubTo(x, 'state', S, true);
+        scheduleRender();
+      });
+      x.c.on('close', () => { if (x.up) { x.up = false; scheduleRender(); } });
+      x.c.on('offline', () => { x.up = false; });
+      x.c.on('error', () => {});
+      x.c.on('message', (topic, buf) => { x.lastRx = Date.now(); onMessage(x, topic, buf); });
+      return x;
+    });
+  }
+  function netClose() {
+    const old = net.clients;
+    net.clients = [];
+    setTimeout(() => old.forEach((x) => { try { x.c.end(); } catch (e) {} }), 1000);
+  }
+  function pubTo(x, sub, obj, retain) {
+    if (!x.up) return;
+    try { x.c.publish(T(sub), obj == null ? '' : JSON.stringify(obj), { qos: 1, retain: !!retain }); } catch (e) {}
+  }
+  function pub(sub, obj, retain) { for (const x of net.clients) pubTo(x, sub, obj, retain); }
+  function beat(x) {
+    if (!x.up) return;
+    try { x.c.publish(T('hb'), JSON.stringify({ pid: room.sid, cid: x.cid }), { qos: 0 }); } catch (e) {}
+  }
+
+  function onMessage(x, topic, buf) {
+    if (!room) return;
+    const parts = topic.split('/');
+    if (parts[0] !== PREFIX || parts[1] !== net.code) return;
+    let o = null;
+    if (buf && buf.length) { try { o = JSON.parse(dec.decode(buf)); } catch (e) { return; } }
+    switch (parts[2]) {
+      case 'hb':
+        if (o && o.pid) { live.beat[x.i][o.pid] = { t: Date.now(), cid: o.cid }; delete live.gone[x.i][o.pid]; }
+        break;
+      case 'gone':
+        if (o && o.pid) {
+          const b = live.beat[x.i][o.pid];
+          if (b && b.cid === o.cid) { live.gone[x.i][o.pid] = true; scheduleRender(); }
+        }
+        break;
+      case 'state': if (o) onState(o); break;
+      case 'p': if (parts[3]) onStatus(parts[3], o); break;
+      case 'act': if (o && isHost()) hostAct(o); break;
+    }
+  }
+
+  // ---------- 誰在線上 ----------
+  function aliveRaw(pid) {
+    if (room && pid === room.sid) return netUp();
+    const now = Date.now();
+    if (net.upAt && now - net.upAt < 4500) return true; // 剛連上，還沒收到大家的心跳
+    return net.clients.some((x) => x.up && !live.gone[x.i][pid] && live.beat[x.i][pid] && now - live.beat[x.i][pid].t < ALIVE_MS);
+  }
+  function online(pid) {
+    // 其他人在不在線，以房主看到的為準，大家才會一致
+    if (!isHost() && S && pid !== S.host) return !(S.off || []).includes(pid);
+    if (aliveRaw(pid)) { delete live.off[pid]; return true; }
+    if (!live.off[pid]) live.off[pid] = Date.now();
+    return Date.now() - live.off[pid] < GRACE_MS;
+  }
+  function offlinePlayers() {
+    if (!S || S.phase !== 'playing' || !S.round) return [];
+    return S.round.order.filter((pid) => !online(pid));
+  }
+  const pausedNow = () => offlinePlayers().length > 0;
+
+  // ================= 收到狀態 =================
+  function onState(o) {
+    if (!room || o.code !== room.code) return;
+    if (isHost()) {
+      if (o.host !== room.sid || (S && o.v <= S.v)) return;
+      S = o; store.set(hostKey(), S);
+      afterState();
+      return;
+    }
+    if (o.closed) { if (S || lookupUntil) leaveRoom(S ? '房主已經解散房間' : '房間 ' + room.code + ' 已經解散了'); return; }
+    if (!S && Date.now() - (o.ts || 0) > STALE_MS) return;
+    if (S && (o.host !== S.host || o.v <= S.v)) return;
+    S = o;
+    afterState();
+  }
+  function onStatus(pid, o) {
+    if (!o) { delete ST[pid]; scheduleRender(); return; }
+    if (o.pid !== pid) return;
+    if (ST[pid] && ST[pid].sv >= o.sv) return;
+    ST[pid] = o;
+    if (isHost()) scheduleHostCheck();
+    scheduleRender();
+  }
+
+  function afterState() {
+    if (!S || !room) return;
+    const listed = S.players.some((p) => p.pid === room.sid);
+    if (!isHost() && !listed) {
+      if ((S.removed || []).includes(room.sid)) { leaveRoom('你已被房主移出房間'); return; }
+      if (S.players.length >= MAX_PLAYERS) { leaveRoom('房間已滿（最多 ' + MAX_PLAYERS + ' 人）'); return; }
+      maybeJoin();
+    }
+    // 有人進出房間
+    const ids = S.players.map((p) => p.pid);
+    if (prevPlayers) {
+      for (const p of S.players) if (!prevPlayers.has(p.pid) && p.pid !== room.sid) toast(p.name + ' 加入了');
+    }
+    prevPlayers = new Set(ids);
+    const fx = syncRound();
+    if (pendingAct && actDone(pendingAct.a)) { pendingAct = null; }
+    effects(fx);
+    if (S.phase !== 'playing' || !S.round || S.round.turn !== room.sid) $('guessSheet').hidden = true;
+    render();
+  }
+
+  // 把房主的喊牌套用到自己的骰子上
+  function syncRound() {
+    const fx = {};
+    const R = S.round;
+    if (S.phase !== 'playing' || !R || !R.order.includes(room.sid)) return fx;
+    if (!my || my.roundId !== R.id) {
+      my = { roundId: R.id, seq: 0, dice: rollN(5) };
+      fx.newRound = true;
+      lastLog = { type: 'start' };
+    }
+    if (R.last && R.last.seq > my.seq) {
+      const k = R.last.k;
+      const keep = my.dice.filter((v) => !SETS[k].includes(v));
+      const removed = my.dice.length - keep.length;
+      my = { roundId: R.id, seq: R.last.seq, dice: rollN(keep.length) };
+      fx.call = { k, by: R.last.by, removed, left: keep.length };
+      lastLog = Object.assign({ type: 'call' }, fx.call);
+    }
+    if (fx.newRound || fx.call) { store.set(myKey(), my); publishStatus(); }
+    return fx;
+  }
+
+  let lastStKey = '';
+  function publishStatus(force, only) {
+    if (!room) return;
+    const st = { pid: room.sid, name: room.name, roundId: my ? my.roundId : null, seq: my ? my.seq : 0, count: my ? my.dice.length : null };
+    const key = JSON.stringify(st);
+    if (!force && key === lastStKey) return;
+    lastStKey = key;
+    st.sv = nextSv();
+    ST[room.sid] = st;
+    if (only) pubTo(only, 'p/' + room.sid, st, true); else pub('p/' + room.sid, st, true);
+    if (isHost()) scheduleHostCheck();
+  }
+
+  const resultKey = () => (S && S.phase === 'over' && S.result ? S.result.roundId + ':' + S.result.type : null);
+  const turnMine = () => !!(S && S.phase === 'playing' && S.round && S.round.turn === room.sid && !S.round.pending);
+  function effects(fx) {
+    if (firstState) { // 剛連上：不補播之前的音效
+      firstState = false;
+      prevResultKey = resultKey();
+      prevTurnMine = turnMine();
+      return;
+    }
+    if (fx.newRound) { sfx.rattle(0.7); shake(); }
+    if (fx.call) {
+      sfx.rattle();
+      if (fx.call.removed) sfx.knocks(fx.call.removed, 0.55); else sfx.thud(0.55);
+      shake();
+      if (fx.call.removed) bump();
+    }
+    const tm = turnMine();
+    if (tm && !prevTurnMine) sfx.turn(fx.call ? 1.1 : 0.4);
+    prevTurnMine = tm;
+    const rk = resultKey();
+    if (rk && rk !== prevResultKey) {
+      const r = S.result;
+      if (r.type === 'blind' && r.win) sfx.win(0.4);
+      else if (r.type !== 'abort') sfx.lose(0.5);
+    }
+    prevResultKey = rk;
+  }
+
+  // ================= 房主：唯一決定順序和輸贏的人 =================
+  function hostCommit() {
+    S.v += 1;
+    S.ts = Date.now();
+    store.set(hostKey(), S);
+    pub('state', S, true);
+    afterState();
+  }
+  let hostCheckTimer = 0;
+  function scheduleHostCheck() {
+    if (!hostCheckTimer) hostCheckTimer = setTimeout(() => { hostCheckTimer = 0; hostCheckPending(); }, 0);
+  }
+  function hostAct(a) {
+    if (!S || !a || !a.mid || seenMids.has(a.mid)) return;
+    seenMids.add(a.mid);
+    if (seenMids.size > 1000) seenMids.clear();
+    if (a.type === 'join') hostJoin(a.pid, a.name);
+    else if (a.type === 'leave') hostRemove(a.pid);
+    else if (a.type === 'call') hostCall(a);
+    else if (a.type === 'blind') hostBlind(a);
+  }
+  function hostJoin(pid, name) {
+    if (!pid || (S.removed || []).includes(pid)) return;
+    name = cleanName(name) || '玩家';
+    const p = S.players.find((p) => p.pid === pid);
+    if (p) { if (p.name !== name) { p.name = name; hostCommit(); } return; }
+    if (S.players.length >= MAX_PLAYERS) return;
+    S.players.push({ pid, name });
+    hostCommit();
+  }
+  function hostRemove(pid) {
+    const idx = S.players.findIndex((p) => p.pid === pid);
+    if (idx < 0 || pid === S.host) return;
+    S.players.splice(idx, 1);
+    S.removed = (S.removed || []).concat(pid).slice(-50);
+    if (S.starter === pid) S.starter = S.host;
+    const R = S.round;
+    if (S.phase === 'playing' && R && R.order.includes(pid)) {
+      const oi = R.order.indexOf(pid);
+      const wasTurn = R.turn === pid;
+      R.order.splice(oi, 1);
+      if (R.order.length < 2) {
+        S.phase = 'over';
+        S.result = { type: 'abort', roundId: R.id };
+        R.pending = false;
+      } else if (wasTurn) {
+        R.turn = R.order[oi % R.order.length];
+      }
+    }
+    hostCommit();
+    scheduleHostCheck();
+  }
+  function validTurnAct(a) {
+    const R = S.round;
+    return S.phase === 'playing' && R && a.roundId === R.id && a.seq === R.seq && a.pid === R.turn && !R.pending && SETS[a.k] && !pausedNow();
+  }
+  function hostCall(a) {
+    if (!validTurnAct(a)) return;
+    const R = S.round;
+    R.seq += 1;
+    R.last = { seq: R.seq, k: a.k, by: a.pid };
+    R.pending = true; // 等每個人回報拿完剩幾顆
+    hostCommit();
+    scheduleHostCheck();
+  }
+  function hostBlind(a) {
+    if (!validTurnAct(a)) return;
+    const R = S.round;
+    const st = ST[a.pid];
+    if (!st || st.roundId !== R.id || st.count !== 1) return;
+    const value = a.value | 0;
+    if (value < 1 || value > 6) return;
+    S.phase = 'over';
+    S.result = { type: 'blind', roundId: R.id, pid: a.pid, k: a.k, value, win: SETS[a.k].includes(value) };
+    S.starter = a.pid;
+    hostCommit();
+  }
+  function hostCheckPending() {
+    const R = S && S.round;
+    if (!R || S.phase !== 'playing' || !R.pending) return;
+    for (const pid of R.order) {
+      const st = ST[pid];
+      if (!st || st.roundId !== R.id || st.seq !== R.seq) return; // 還有人沒回報
+    }
+    const losers = R.order.filter((pid) => ST[pid].count === 0);
+    R.counts = Object.fromEntries(R.order.map((pid) => [pid, ST[pid].count]));
+    R.pending = false;
+    if (losers.length) {
+      S.phase = 'over';
+      S.result = { type: 'cleared', roundId: R.id, losers, by: R.last.by, k: R.last.k };
+      S.starter = losers[0];
+    } else {
+      const i = R.order.indexOf(R.last.by);
+      R.turn = i >= 0 ? R.order[(i + 1) % R.order.length] : R.turn;
+    }
+    hostCommit();
+  }
+  function hostStart() {
+    if (!S || S.phase === 'playing') return;
+    const order = S.players.map((p) => p.pid).filter((pid) => online(pid));
+    if (order.length < 2) return;
+    const starter = order.includes(S.starter) ? S.starter : order[0];
+    S.round = { id: (S.round ? S.round.id : 0) + 1, order, turn: starter, seq: 0, last: null, pending: false,
+      counts: Object.fromEntries(order.map((pid) => [pid, 5])) };
+    S.phase = 'playing';
+    S.result = null;
+    hostCommit();
+  }
+  function hostMove(pid, dir) {
+    const i = S.players.findIndex((p) => p.pid === pid);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= S.players.length) return;
+    [S.players[i], S.players[j]] = [S.players[j], S.players[i]];
+    hostCommit();
+  }
+  function hostSetStarter(pid) { if (S.starter !== pid) { S.starter = pid; hostCommit(); } }
+  function hostSyncOff() {
+    if (!S) return;
+    const off = S.players.filter((p) => p.pid !== S.host && !online(p.pid)).map((p) => p.pid);
+    if (JSON.stringify(off) !== JSON.stringify(S.off || [])) { S.off = off; hostCommit(); }
+  }
+
+  // ================= 玩家送出動作 =================
+  function maybeJoin() {
+    if (!netUp() || Date.now() - lastJoinAt < 2500) return;
+    lastJoinAt = Date.now();
+    pub('act', { type: 'join', mid: rid(10), pid: room.sid, name: room.name });
+  }
+  function sendAct(a) {
+    a.mid = rid(10);
+    a.pid = room.sid;
+    if (isHost()) { hostAct(a); return; }
+    pendingAct = { a, at: Date.now(), tries: 1 };
+    pub('act', a);
+    render();
+  }
+  function actDone(a) {
+    const R = S && S.round;
+    if (!R || R.id !== a.roundId || S.phase !== 'playing') return true;
+    return R.seq !== a.seq || R.turn !== a.pid;
+  }
+  function canAct() {
+    if (!S || !room || S.phase !== 'playing' || !S.round) return false;
+    const R = S.round;
+    return R.turn === room.sid && !R.pending && !pendingAct && netUp() && !pausedNow()
+      && my && my.roundId === R.id && my.seq === R.seq && my.dice.length > 0;
+  }
+
+  // ================= 進出房間 =================
+  function probeCode(code) {
+    // 看這個房號現在有沒有人在用：true＝有人用、false＝沒人用、null＝連不上
+    return new Promise((resolve) => {
+      let left = BROKERS.length, anyUp = false, taken = false, finished = false;
+      const cs = [];
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        cs.forEach((c) => { try { c.end(true); } catch (e) {} });
+        resolve(taken ? true : anyUp ? false : null);
+      };
+      const timer = setTimeout(finish, 9000);
+      BROKERS.forEach((url) => {
+        const c = mqtt.connect(url, { clientId: 'hh' + rid(12), reconnectPeriod: 0, connectTimeout: 7000, clean: true });
+        cs.push(c);
+        let settled = false;
+        const settle = () => { if (!settled) { settled = true; if (--left <= 0) finish(); } };
+        c.on('connect', () => {
+          anyUp = true;
+          c.subscribe(PREFIX + '/' + code + '/state', { qos: 1 }, () => setTimeout(settle, 1200));
+        });
+        c.on('message', (t, buf) => {
+          if (!buf || !buf.length) return;
+          try {
+            const o = JSON.parse(dec.decode(buf));
+            if (!o.closed && Date.now() - (o.ts || 0) < STALE_MS) { taken = true; finish(); }
+          } catch (e) {}
+        });
+        c.on('error', settle);
+        c.on('close', settle);
+      });
+    });
+  }
+
+  let busy = false;
+  function homeMsg(text, err) { const m = $('homeMsg'); m.textContent = text || ''; m.classList.toggle('err', !!err); }
+  function setBusy(b) { busy = b; $('createBtn').disabled = b; $('joinBtn').disabled = b; }
+
+  async function createRoom() {
+    if (busy) return;
+    const name = cleanName($('nameIn').value);
+    if (!name) { homeMsg('先輸入你的暱稱', true); $('nameIn').focus(); return; }
+    store.set('hhds.name', name);
+    setBusy(true);
+    homeMsg('開房中…');
+    let code = null;
+    for (let i = 0; i < 6 && !code; i++) {
+      const c = String(1000 + Math.floor(Math.random() * 9000));
+      const taken = await probeCode(c);
+      if (taken === null) { setBusy(false); homeMsg('連不上伺服器，檢查網路後再試一次', true); return; }
+      if (!taken) code = c;
+    }
+    setBusy(false);
+    if (!code) { homeMsg('開房失敗，再試一次', true); return; }
+    const sid = rid(8);
+    room = { code, sid, name, host: true };
+    store.set('hhds.room', room);
+    S = { v: 1, ts: Date.now(), code, host: sid, players: [{ pid: sid, name }], phase: 'lobby', round: null, result: null, starter: sid, removed: [] };
+    store.set(hostKey(), S);
+    homeMsg('');
+    enterRoom();
+  }
+
+  function joinRoom() {
+    if (busy) return;
+    const name = cleanName($('nameIn').value);
+    const code = $('codeIn').value.replace(/\D/g, '');
+    if (!name) { homeMsg('先輸入你的暱稱', true); $('nameIn').focus(); return; }
+    if (!/^\d{4}$/.test(code)) { homeMsg('房號是 4 個數字', true); $('codeIn').focus(); return; }
+    store.set('hhds.name', name);
+    room = { code, sid: rid(8), name, host: false };
+    store.set('hhds.room', room);
+    homeMsg('');
+    enterRoom();
+  }
+
+  function enterRoom() {
+    ST = {}; my = store.get(myKey()); pendingAct = null;
+    S = isHost() ? store.get(hostKey()) : null;
+    firstState = true; lookupUntil = 0; lastJoinAt = 0; prevPlayers = null; lastLog = null; lastStKey = '';
+    live.beat = [{}, {}]; live.gone = [{}, {}]; live.off = {};
+    net.downSince = 0;
+    for (const el of $$('[data-code]')) el.textContent = room.code;
+    if (isHost() && !S) { leaveRoom('找不到房間資料，請重新開房'); return; }
+    netOpen();
+    if (S) afterState(); else render();
+  }
+
+  function leaveRoom(msg) {
+    if (room) {
+      if (isHost()) {
+        if (S && !S.closed) { S.closed = true; S.v += 1; S.ts = Date.now(); pub('state', S, true); }
+        store.del(hostKey());
+      } else {
+        pub('act', { type: 'leave', mid: rid(10), pid: room.sid });
+      }
+      pub('p/' + room.sid, null, true);
+      for (const x of net.clients) {
+        if (x.up) { try { x.c.publish(T('gone'), JSON.stringify({ pid: room.sid, cid: x.cid }), { qos: 0 }); } catch (e) {} }
+      }
+      store.del(myKey());
+    }
+    netClose();
+    room = null; S = null; ST = {}; my = null; pendingAct = null; lookupUntil = 0;
+    store.del('hhds.room');
+    $('guessSheet').hidden = true;
+    homeMsg(msg || '', !!msg);
+    render();
+  }
+
+  // ================= 畫面 =================
+  const SCREENS = ['home', 'lobby', 'game'];
+  function show(id) { for (const s of SCREENS) $(s).hidden = s !== id; }
+  let renderTimer = 0;
+  function scheduleRender() { if (!renderTimer) renderTimer = setTimeout(() => { renderTimer = 0; render(); }, 0); }
+
+  function render() {
+    if (!room) { show('home'); $('overlay').hidden = true; return; }
+    const inRound = S && S.phase === 'playing' && S.round && S.round.order.includes(room.sid);
+    if (inRound) { show('game'); renderGame(); } else { show('lobby'); renderLobby(); }
+    for (const d of $$('[data-dot]')) d.classList.toggle('on', netUp());
+    for (const b of $$('[data-leave]')) {
+      b.classList.toggle('armed', armed === 'leave');
+      b.textContent = armed === 'leave' ? (isHost() ? '確定解散？' : '確定離開？') : (isHost() ? '解散' : '離開');
+    }
+    renderOverlay();
+  }
+
+  function dieEl(v, big) {
+    const d = h('div', { class: 'die' + (v === 1 || v === 4 ? ' red' : '') + (v === 1 ? ' one' : '') + (big ? ' big' : ''), 'aria-label': v + ' 點' });
+    for (let i = 0; i < 9; i++) d.append(PIPS[v].includes(i) ? h('span', null, h('i')) : h('span'));
+    return d;
+  }
+
+  function countText(pid) {
+    const c = S.round && S.round.counts ? S.round.counts[pid] : null;
+    return c == null ? '…' : String(c);
+  }
+
+  function renderLobby() {
+    $('siteUrl').textContent = location.host + location.pathname.replace(/index\.html$/, '');
+    const lobbyMsg = $('lobbyMsg');
+    const startBtn = $('startBtn');
+    const rc = $('resultCard');
+    if (!S) {
+      rc.hidden = true;
+      patch($('players'), 'none', () => []);
+      startBtn.hidden = true;
+      $('listHint').textContent = '';
+      lobbyMsg.textContent = netUp() ? '找房間 ' + room.code + ' 中…' : '連線中…';
+      return;
+    }
+    // 上一局結果
+    const r = S.phase === 'over' ? S.result : null;
+    rc.hidden = !r;
+    if (r) {
+      const names = r.losers ? r.losers.map(nameOf).join('、') : '';
+      patch(rc, JSON.stringify(r) + names, () => {
+        rc.classList.toggle('safe', r.type === 'blind' && r.win);
+        if (r.type === 'cleared') return [h('div', { class: 'res-text' },
+          h('div', { class: 'res-word bad', text: '喝！' }),
+          h('div', { class: 'res-who', text: names + '被拿光了' }),
+          h('div', { class: 'res-sub', text: nameOf(r.by) + '喊「' + r.k + '」' }))];
+        if (r.type === 'blind') return [dieEl(r.value, true), h('div', { class: 'res-text' },
+          h('div', { class: 'res-word ' + (r.win ? 'good' : 'bad'), text: r.win ? '安全' : '喝！' }),
+          h('div', { class: 'res-who', text: nameOf(r.pid) + '盲猜「' + r.k + '」' }),
+          h('div', { class: 'res-sub', text: '開出 ' + r.value + ' 點，' + (r.win ? '猜中了' : '猜錯了') }))];
+        return [h('div', { class: 'res-text' }, h('div', { class: 'res-who', text: '人數不夠，這局提前結束' }))];
+      });
+    }
+    // 玩家名單
+    const host = isHost();
+    const editing = host && S.phase !== 'playing';
+    $('listHint').textContent = editing ? '調整順序、選誰先喊' : (S.players.length + ' / ' + MAX_PLAYERS + ' 人');
+    const rows = S.players.map((p, i) => {
+      const on = online(p.pid);
+      let st = '';
+      if (!on) st = '離線';
+      else if (S.phase === 'playing' && S.round && !S.round.order.includes(p.pid)) st = '下一局加入';
+      else if (S.phase === 'playing') st = '剩 ' + countText(p.pid) + ' 顆';
+      return { p, i, on, st };
+    });
+    const sig = JSON.stringify([rows.map((r) => [r.p.pid, r.p.name, r.on, r.st]), S.starter, S.phase, editing, armed]);
+    patch($('players'), sig, () => rows.map(({ p, i, on, st }) => {
+      const me = p.pid === room.sid;
+      const isH = p.pid === S.host;
+      return h('li', { class: 'pl' + (on ? '' : ' off') },
+        h('div', { class: 'pl-main' },
+          h('span', { class: 'pl-num', text: String(i + 1) }),
+          h('span', { class: 'pl-name', text: p.name }),
+          me && h('span', { class: 'tag', text: '你' }),
+          isH && h('span', { class: 'tag brass', text: '房主' }),
+          S.phase !== 'playing' && S.starter === p.pid && h('span', { class: 'tag red', text: '先喊' }),
+          h('span', { class: 'pl-st', text: st })),
+        editing && h('div', { class: 'pl-ctl' },
+          h('button', { class: 'mini', type: 'button', disabled: i === 0, 'aria-label': '往前移', onclick: () => hostMove(p.pid, -1), text: '▲' }),
+          h('button', { class: 'mini', type: 'button', disabled: i === S.players.length - 1, 'aria-label': '往後移', onclick: () => hostMove(p.pid, 1), text: '▼' }),
+          h('button', { class: 'mini' + (S.starter === p.pid ? ' on' : ''), type: 'button', onclick: () => hostSetStarter(p.pid), text: '先喊' }),
+          !isH && h('button', { class: 'mini warn' + (armed === 'rm:' + p.pid ? ' armed' : ''), type: 'button', onclick: () => { if (arm('rm:' + p.pid)) hostRemove(p.pid); }, text: armed === 'rm:' + p.pid ? '確定移出？' : '移出' })));
+    }));
+    // 底部
+    const listed = S.players.some((p) => p.pid === room.sid);
+    if (host) {
+      const n = rows.filter((r) => r.on).length;
+      startBtn.hidden = false;
+      startBtn.textContent = S.round ? '再來一局' : '開始';
+      startBtn.disabled = S.phase === 'playing' || n < 2;
+      lobbyMsg.textContent = S.phase === 'playing' ? '' : n < 2 ? '至少要 2 個人在線才能開始' : '按「先喊」選誰先喊，' + (S.round ? '再按再來一局' : '再按開始');
+    } else {
+      startBtn.hidden = true;
+      lobbyMsg.textContent = !listed ? '加入房間中…'
+        : !online(S.host) ? '房主離線中，等房主回來…'
+        : S.phase === 'playing' ? '這局進行中，下一局才會加入'
+        : S.phase === 'over' ? '等房主開下一局'
+        : '等房主開始';
+    }
+  }
+
+  let diceKey = '';
+  function renderGame() {
+    const R = S.round;
+    const n = my && my.roundId === R.id ? my.dice.length : 0;
+    $('count').textContent = n;
+    // 右上角：其他人剩幾顆（照輪流順序，從我下一位開始）
+    const k = R.order.indexOf(room.sid);
+    const others = R.order.slice(k + 1).concat(R.order.slice(0, k));
+    const opps = $('opps');
+    opps.classList.toggle('two', others.length > 4);
+    const sig = JSON.stringify(others.map((pid) => [pid, rawName(pid), countText(pid), R.turn === pid && !R.pending, online(pid)]));
+    patch(opps, sig, () => others.map((pid) => h('li', { class: 'opp' + (R.turn === pid && !R.pending ? ' turn' : '') + (online(pid) ? '' : ' off') },
+      h('span', { class: 'opp-name', text: rawName(pid) }),
+      h('span', { class: 'opp-n', text: countText(pid) }))));
+    // 輪到誰
+    const tl = $('turnLine');
+    const mine = R.turn === room.sid && !R.pending;
+    tl.classList.toggle('mine', mine && !pendingAct);
+    tl.textContent = R.pending ? '大家拿骰子中…'
+      : pendingAct ? '送出中…'
+      : mine ? (n === 1 ? '輪到你！喊一個，或按盲猜' : '輪到你喊！')
+      : '輪到 ' + rawName(R.turn) + ' 喊';
+    // 上一個動作
+    const log = $('log');
+    if (lastLog && lastLog.type === 'call') {
+      const L = lastLog;
+      const tail = L.removed ? ['你拿掉 ', h('b', { text: String(L.removed) }), ' 顆' + (L.left ? '，剩下重搖' : '')] : ['你沒有要拿的，重搖'];
+      patch(log, JSON.stringify(L) + nameOf(L.by), () => [h('b', { text: nameOf(L.by) }), '喊「', h('b', { text: L.k }), '」· ', ...tail]);
+    } else {
+      patch(log, 'start', () => ['新的一局，大家搖好 5 顆了']);
+    }
+    // 骰子
+    const key = my ? my.roundId + ':' + my.seq : '';
+    if (key !== diceKey) {
+      diceKey = key;
+      $('dice').replaceChildren(...(my ? my.dice : []).map((v) => { const d = dieEl(v); d.classList.add('rolling'); return d; }));
+    }
+    const cleared = n === 0;
+    if (n < 2) $('zone').classList.remove('peek');
+    $('hint').textContent = n === 1 ? '最後一顆不能看' : '按住偷看 · 放開蓋回';
+    $('cup').hidden = cleared;
+    $('hint').hidden = cleared;
+    const banner = $('banner');
+    banner.hidden = !cleared;
+    if (cleared) patch(banner, 'cleared', () => [h('div', { class: 'big-word bad', text: '喝！' }), h('div', { class: 'sub', text: '骰子被拿光了' })]);
+    // 按鈕
+    const ok = canAct();
+    for (const b of $$('#calls .call')) b.disabled = !ok;
+    $('guessBtn').hidden = !(ok && n === 1);
+  }
+
+  function renderOverlay() {
+    const ov = $('overlay');
+    if (!room) { ov.hidden = true; return; }
+    if (!netUp()) { if (!net.downSince) net.downSince = Date.now(); } else net.downSince = 0;
+    if (net.downSince && Date.now() - net.downSince > GRACE_MS) {
+      ov.hidden = false;
+      patch($('ovCard'), 'net', () => [
+        h('div', { class: 'ov-title', text: '連線中' }),
+        h('p', { text: '網路斷了，正在重新連線…' }),
+        h('p', { class: 'sub', text: '連回來就會自動繼續' })]);
+      return;
+    }
+    const inRound = S && S.phase === 'playing' && S.round && S.round.order.includes(room.sid);
+    const off = inRound ? offlinePlayers().filter((pid) => pid !== room.sid) : [];
+    if (!off.length) { ov.hidden = true; return; }
+    ov.hidden = false;
+    const host = isHost();
+    patch($('ovCard'), JSON.stringify([off.map(rawName), host, armed]), () => [
+      h('div', { class: 'ov-title', text: '暫停' }),
+      h('p', null, '等 ', ...off.flatMap((pid, i) => [i ? '、' : '', h('b', { text: rawName(pid) })]), ' 回來…'),
+      h('p', { class: 'sub', text: host ? '一直沒回來的話，可以把他移出房間' : '回來就會自動繼續' }),
+      host && h('div', { class: 'ov-btns' }, off.map((pid) => h('button', {
+        class: 'primary alt' + (armed === 'rm:' + pid ? ' armed' : ''), type: 'button',
+        onclick: () => { if (arm('rm:' + pid)) hostRemove(pid); },
+        text: armed === 'rm:' + pid ? '確定移出 ' + rawName(pid) + '？' : '移出 ' + rawName(pid),
+      })))]);
+  }
+
+  // 按兩下確認
+  let armed = null, armTimer = 0;
+  function arm(key) {
+    clearTimeout(armTimer);
+    if (armed === key) { armed = null; render(); return true; }
+    armed = key;
+    armTimer = setTimeout(() => { armed = null; render(); }, 3000);
+    render();
+    return false;
+  }
+
+  function shake() { const z = $('zone'); z.classList.remove('shaking'); void z.offsetWidth; z.classList.add('shaking'); }
+  function bump() { const c = $('count'); c.classList.add('bump'); setTimeout(() => c.classList.remove('bump'), 250); }
+
+  // ================= 操作 =================
+  $('createBtn').addEventListener('click', createRoom);
+  $('joinBtn').addEventListener('click', joinRoom);
+  $('codeIn').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4); });
+  $('codeIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });
+  $('nameIn').value = store.get('hhds.name') || '';
+  $('startBtn').addEventListener('click', hostStart);
+
+  $('calls').addEventListener('click', (e) => {
+    const b = e.target.closest('.call');
+    if (!b || b.disabled || !canAct()) return;
+    sendAct({ type: 'call', roundId: S.round.id, seq: S.round.seq, k: b.dataset.k });
+  });
+
+  // 盲猜：只有輪到自己、剩 1 顆時才能按
+  $('guessBtn').addEventListener('click', () => {
+    if (!canAct() || my.dice.length !== 1) return;
+    $('guessMsg').textContent = '骰子會重搖，誰都看不到。猜它是：';
+    for (const b of $$('#guessCalls .call')) b.disabled = false;
+    $('guessSheet').hidden = false;
+  });
+  $('guessCancel').addEventListener('click', () => { $('guessSheet').hidden = true; });
+  $('guessCalls').addEventListener('click', (e) => {
+    const b = e.target.closest('.call');
+    if (!b || b.disabled || !canAct()) return;
+    for (const x of $$('#guessCalls .call')) x.disabled = true;
+    $('guessMsg').textContent = '開骰中…';
+    sendAct({ type: 'blind', roundId: S.round.id, seq: S.round.seq, k: b.dataset.k, value: roll() });
+  });
+
+  // 按住偷看
+  const zone = $('zone');
+  const peekOn = (e) => {
+    const n = my && S && S.round && my.roundId === S.round.id ? my.dice.length : 0;
+    if (n >= 2) {
+      e.preventDefault();
+      if (!zone.classList.contains('peek')) sfx.swish();
+      zone.classList.add('peek');
+    } else if (n === 1 && !e.repeat) {
+      e.preventDefault();
+      sfx.denied();
+    }
+  };
+  const peekOff = () => zone.classList.remove('peek');
+  zone.addEventListener('pointerdown', peekOn);
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => zone.addEventListener(t, peekOff));
+  zone.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') peekOn(e); });
+  zone.addEventListener('keyup', peekOff);
+  zone.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  for (const b of $$('[data-leave]')) b.addEventListener('click', () => { if (arm('leave')) leaveRoom(''); });
+  for (const b of $$('[data-rules]')) b.addEventListener('click', () => { $('rulesSheet').hidden = false; });
+  $('rulesClose').addEventListener('click', () => { $('rulesSheet').hidden = true; });
+  $('rulesSheet').addEventListener('click', (e) => { if (e.target.id === 'rulesSheet') $('rulesSheet').hidden = true; });
+
+  const paintMute = () => { for (const b of $$('[data-mute]')) { b.textContent = muted ? '🔇' : '🔊'; b.setAttribute('aria-pressed', String(muted)); } };
+  paintMute();
+  for (const b of $$('[data-mute]')) b.addEventListener('click', () => {
+    muted = !muted;
+    store.set(SFX_KEY, muted ? '1' : '0');
+    paintMute();
+    if (!muted) sfx.knocks(1);
+  });
+
+  // 螢幕保持亮著，減少斷線
+  let wake = null;
+  async function keepAwake() {
+    try {
+      if (navigator.wakeLock && document.visibilityState === 'visible' && (!wake || wake.released)) wake = await navigator.wakeLock.request('screen');
+    } catch (e) {}
+  }
+  document.addEventListener('pointerdown', keepAwake);
+
+  // 切回畫面：檢查連線是不是已經死掉
+  document.addEventListener('visibilitychange', () => {
+    peekOff();
+    if (document.visibilityState !== 'visible') return;
+    keepAwake();
+    const now = Date.now();
+    for (const x of net.clients) {
+      if (x.up && now - x.lastRx > 6000) { try { x.c.stream && x.c.stream.destroy(); } catch (e) {} }
+      else if (!x.up) { try { x.c.reconnect(); } catch (e) {} }
+    }
+  });
+  window.addEventListener('pagehide', () => {
+    if (!room) return;
+    for (const x of net.clients) {
+      if (x.up) { try { x.c.publish(T('gone'), JSON.stringify({ pid: room.sid, cid: x.cid }), { qos: 0 }); } catch (e) {} }
+    }
+  });
+
+  // 每秒：心跳、重送、檢查斷線
+  setInterval(() => {
+    if (!room) return;
+    const now = Date.now();
+    if (now - net.lastBeat >= HB_MS) { net.lastBeat = now; net.clients.forEach(beat); }
+    for (const x of net.clients) {
+      if (x.up && now - x.lastRx > 12000) { try { x.c.stream && x.c.stream.destroy(); } catch (e) {} }
+    }
+    if (!S && lookupUntil && now > lookupUntil) { leaveRoom('找不到房間 ' + room.code + '，請確認房號'); return; }
+    if (S && !isHost()) {
+      if (!S.players.some((p) => p.pid === room.sid)) maybeJoin();
+      if (pendingAct) {
+        if (actDone(pendingAct.a)) pendingAct = null;
+        else if (now - pendingAct.at > 2500) {
+          if (pendingAct.tries >= 4) {
+            pendingAct = null;
+            toast('沒送出去，再按一次');
+            for (const x of $$('#guessCalls .call')) x.disabled = false;
+            $('guessMsg').textContent = '沒送出去，再選一次：';
+          } else { pendingAct.tries++; pendingAct.at = now; pub('act', pendingAct.a); }
+        }
+      }
+    }
+    if (isHost()) { hostSyncOff(); scheduleHostCheck(); }
+    render();
+  }, 1000);
+
+  // 開啟時：之前在房間裡就自動回去
+  if (room && room.code && room.sid) enterRoom(); else { room = null; render(); }
+})();
+</script>
+</body>
+</html>
